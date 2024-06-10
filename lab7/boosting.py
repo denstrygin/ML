@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
-
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from sklearn.tree import DecisionTreeRegressor
-
+import matplotlib.pyplot as plt
 
 def score(clf, x, y):
     return roc_auc_score(y == 1, clf.predict_proba(x)[:, 1])
-
 
 class Boosting:
 
     def __init__(
             self,
+            base_model_class=DecisionTreeRegressor,
             base_model_params: dict = None,
             n_estimators: int = 10,
             learning_rate: float = 0.1,
@@ -22,7 +21,7 @@ class Boosting:
             early_stopping_rounds: int = None,
             plot: bool = False,
     ):
-        self.base_model_class = DecisionTreeRegressor
+        self.base_model_class = base_model_class
         self.base_model_params: dict = {} if base_model_params is None else base_model_params
 
         self.n_estimators: int = n_estimators
@@ -62,8 +61,18 @@ class Boosting:
         ----------
         Эта функция добавляет новую модель и обновляет ансамбль.
         """
-        self.gammas.append()
-        self.models.append()
+        indices = np.random.choice(np.arange(x.shape[0]), size=int(self.subsample * x.shape[0]), replace=True)
+        x_bootstrap = x[indices]
+        y_bootstrap = y[indices]
+        residuals = y_bootstrap - self.sigmoid(predictions[indices])
+        base_model = self.base_model_class(**self.base_model_params)
+        base_model.fit(x_bootstrap, residuals)
+
+        new_predictions = base_model.predict(x)
+        gamma = self.find_optimal_gamma(y, predictions, new_predictions)
+        
+        self.models.append(base_model)
+        self.gammas.append(gamma)
 
     def fit(self, x_train, y_train, x_valid, y_valid):
         """
@@ -83,12 +92,41 @@ class Boosting:
         train_predictions = np.zeros(y_train.shape[0])
         valid_predictions = np.zeros(y_valid.shape[0])
 
+        no_improvement_count = 0
+
         for _ in range(self.n_estimators):
-            self.fit_new_base_model()
+            self.fit_new_base_model(x_train, y_train, train_predictions)
+            new_train_predictions = self.models[-1].predict(x_train) * self.gammas[-1] * self.learning_rate
+            new_valid_predictions = self.models[-1].predict(x_valid) * self.gammas[-1] * self.learning_rate
+
+            train_predictions += new_train_predictions
+            valid_predictions += new_valid_predictions
+
+            train_loss = self.loss_fn(y_train, train_predictions)
+            valid_loss = self.loss_fn(y_valid, valid_predictions)
+
+            self.history['train_loss'].append(train_loss)
+            self.history['valid_loss'].append(valid_loss)
 
             if self.early_stopping_rounds is not None:
+                if valid_loss < self.validation_loss.min():
+                    self.validation_loss = np.roll(self.validation_loss, -1)
+                    self.validation_loss[-1] = valid_loss
+                    no_improvement_count = 0
+                else:
+                    no_improvement_count += 1
+                    if no_improvement_count >= self.early_stopping_rounds:
+                        break
 
         if self.plot:
+            plt.figure(figsize=(10, 5))
+            plt.plot(self.history['train_loss'], label='Train Loss')
+            plt.plot(self.history['valid_loss'], label='Valid Loss')
+            plt.xlabel('Iterations')
+            plt.ylabel('Loss')
+            plt.title('Training and Validation Loss')
+            plt.legend()
+            plt.show()
 
     def predict_proba(self, x):
         """
@@ -101,11 +139,16 @@ class Boosting:
 
         Возвращает
         ----------
-        probabilities : array-like, форма (n_samples, n_classes)
+        probabilities : array-like, форма (n_samples, 2)
             Вероятности для каждого класса.
         """
+        predictions = np.zeros(x.shape[0])
+
         for gamma, model in zip(self.gammas, self.models):
-            pass
+            predictions += gamma * self.learning_rate * model.predict(x)
+
+        probabilities = self.sigmoid(predictions)
+        return np.vstack((1 - probabilities, probabilities)).T
 
     def find_optimal_gamma(self, y, old_predictions, new_predictions) -> float:
         """
@@ -151,4 +194,9 @@ class Boosting:
         ----------
         Важность признаков определяется по вкладу каждого признака в финальную модель.
         """
-        pass
+        total_importance = np.zeros(self.models[0].feature_importances_.shape)
+        for model in self.models:
+            total_importance += model.feature_importances_
+        # Нормализация важности признаков
+        total_importance /= total_importance.sum()
+        return total_importance
