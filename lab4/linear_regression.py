@@ -7,8 +7,6 @@ import numpy as np
 from descents import BaseDescent
 from descents import get_descent
 
-from scipy.sparse import csr_matrix
-
 
 class LinearRegression:
     """
@@ -49,7 +47,7 @@ class LinearRegression:
 
         self.loss_history: List[float] = []
 
-    def fit(self, x: csr_matrix, y: np.ndarray) -> LinearRegression:
+    def fit(self, x: np.ndarray, y: np.ndarray) -> LinearRegression:
         """
         Обучение модели линейной регрессии, подбор весов для наборов данных x и y.
 
@@ -81,7 +79,7 @@ class LinearRegression:
 
         return self
 
-    def predict(self, x: csr_matrix) -> np.ndarray:
+    def predict(self, x: np.ndarray) -> np.ndarray:
         """
         Прогнозирование целевых переменных для набора данных x.
 
@@ -97,7 +95,7 @@ class LinearRegression:
         """
         return self.descent.predict(x)
 
-    def calc_loss(self, x: csr_matrix, y: np.ndarray) -> float:
+    def calc_loss(self, x: np.ndarray, y: np.ndarray) -> float:
         """
         Расчёт значения функции потерь для наборов данных x и y.
 

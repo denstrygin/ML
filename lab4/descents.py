@@ -3,7 +3,6 @@ from enum import auto
 from enum import Enum
 from typing import Dict
 from typing import Type
-from scipy.sparse import csr_matrix
 
 import numpy as np
 
@@ -131,7 +130,7 @@ class BaseDescent:
         self.lr: LearningRate = LearningRate(lambda_=lambda_)
         self.loss_function: LossFunction = loss_function
 
-    def step(self, x: csr_matrix, y: np.ndarray) -> np.ndarray:
+    def step(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
         Выполнение одного шага градиентного спуска.
 
@@ -166,7 +165,7 @@ class BaseDescent:
         """
         pass
 
-    def calc_gradient(self, x: csr_matrix, y: np.ndarray) -> np.ndarray:
+    def calc_gradient(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
         Шаблон функции для вычисления градиента функции потерь по весам. Должен быть переопределен в подклассах.
 
@@ -184,7 +183,7 @@ class BaseDescent:
         """
         pass
 
-    def calc_loss(self, x: csr_matrix, y: np.ndarray) -> float:
+    def calc_loss(self, x: np.ndarray, y: np.ndarray) -> float:
         """
         Вычисление значения функции потерь с использованием текущих весов.
 
@@ -203,7 +202,7 @@ class BaseDescent:
         y_pred = self.predict(x)
         return np.mean((y - y_pred) ** 2)
 
-    def predict(self, x: csr_matrix) -> np.ndarray:
+    def predict(self, x: np.ndarray) -> np.ndarray:
         """
         Расчет прогнозов на основе признаков x.
 
@@ -217,7 +216,7 @@ class BaseDescent:
         np.ndarray
             Прогнозируемые значения.
         """
-        return x.dot(self.w)
+        return np.dot(x, self.w)
 
 
 class VanillaGradientDescent(BaseDescent):
@@ -251,7 +250,7 @@ class VanillaGradientDescent(BaseDescent):
         self.w += weight_difference
         return weight_difference
 
-    def calc_gradient(self, x: csr_matrix, y: np.ndarray) -> np.ndarray:
+    def calc_gradient(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
         Вычисление градиента функции потерь по весам.
 
@@ -268,7 +267,7 @@ class VanillaGradientDescent(BaseDescent):
             Градиент функции потерь по весам.
         """
         y_pred = self.predict(x)
-        gradient = -2 * x.T.dot(y - y_pred) / y.size
+        gradient = -2 * np.dot(x.T, y - y_pred) / y.size
         return gradient
 
 
@@ -298,7 +297,7 @@ class StochasticDescent(VanillaGradientDescent):
         super().__init__(dimension, lambda_, loss_function)
         self.batch_size = batch_size
 
-    def calc_gradient(self, x: csr_matrix, y: np.ndarray) -> np.ndarray:
+    def calc_gradient(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
         Вычисление градиента функции потерь по мини-пакетам.
 
@@ -318,7 +317,7 @@ class StochasticDescent(VanillaGradientDescent):
         x_batch = x[batch_indices]
         y_batch = y[batch_indices]
         y_pred_batch = self.predict(x_batch)
-        gradient = -2 * x_batch.T.dot(y_batch - y_pred_batch) / self.batch_size
+        gradient = -2 * np.dot(x_batch.T, y_batch - y_pred_batch) / self.batch_size
         return gradient
 
 
