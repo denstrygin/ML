@@ -7,6 +7,8 @@ import numpy as np
 from descents import BaseDescent
 from descents import get_descent
 
+from scipy.sparse import csr_matrix
+
 
 class LinearRegression:
     """
@@ -47,7 +49,7 @@ class LinearRegression:
 
         self.loss_history: List[float] = []
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> LinearRegression:
+    def fit(self, x: csr_matrix, y: np.ndarray) -> LinearRegression:
         """
         Обучение модели линейной регрессии, подбор весов для наборов данных x и y.
 
@@ -64,10 +66,22 @@ class LinearRegression:
             Возвращает экземпляр класса с обученными весами.
 
         """
-        # TODO: реализовать подбор весов для x и y
-        raise NotImplementedError('Функция fit класса LinearRegression не реализована')
+        self.loss_history.append(self.calc_loss(x, y))
 
-    def predict(self, x: np.ndarray) -> np.ndarray:
+        for iteration in range(self.max_iter):
+            prev_weights = self.descent.w.copy()
+            self.descent.step(x, y)
+            self.loss_history.append(self.calc_loss(x, y))
+
+            weight_diff = np.linalg.norm(self.descent.w - prev_weights)
+            if weight_diff < self.tolerance:
+                break
+            if np.isnan(self.descent.w).any():
+                break
+
+        return self
+
+    def predict(self, x: csr_matrix) -> np.ndarray:
         """
         Прогнозирование целевых переменных для набора данных x.
 
@@ -83,7 +97,7 @@ class LinearRegression:
         """
         return self.descent.predict(x)
 
-    def calc_loss(self, x: np.ndarray, y: np.ndarray) -> float:
+    def calc_loss(self, x: csr_matrix, y: np.ndarray) -> float:
         """
         Расчёт значения функции потерь для наборов данных x и y.
 
